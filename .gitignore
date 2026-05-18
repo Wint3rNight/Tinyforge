@@ -1,0 +1,70 @@
+# Build output
+build/
+build-*/
+out/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+
+# CUDA / NVIDIA profiler output
+*.ptx
+*.cubin
+*.fatbin
+*.i
+*.ii
+*.cudafe1.*
+*.module_id
+*.ncu-rep
+*.nsys-rep
+*.qdrep
+*.sqlite
+ncu_*.txt
+nsys_*.txt
+profiles/
+*.nvprof
+
+# Benchmark / experiment artifacts
+results/*.csv
+results/*.json
+results/*.png
+results/*.svg
+!results/.gitkeep
+
+# Python (for scripts/)
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+
+# IDE / editor
+.vscode/
+.idea/
+.cache/
+.clangd/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local plan / private notes (kept out of public repo)
+CUDA_PROJECT_PLAN*.md
+NOTES.md
+TODO.md
+.scratch/
