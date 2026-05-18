@@ -40,6 +40,36 @@ add_compile_options(
     $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>
 )
 
-include_directories(${CMAKE_SOURCE_DIR}/include)
+add_library(tinyforge_ref STATIC
+    src/reference/reference.cpp
+)
+target_include_directories(tinyforge_ref PUBLIC
+    ${CMAKE_SOURCE_DIR}/include
+)
 
 add_executable(hello_cuda src/hello_cuda.cu)
+target_link_libraries(hello_cuda PRIVATE tinyforge_ref)
+
+add_executable(test_setup src/test_setup.cu)
+target_link_libraries(test_setup PRIVATE tinyforge_ref)
+
+# ── clangd-friendly compile_commands.json ─────────────────────────────────────
+# 'clangd_db' runs scripts/fix_compile_commands.py after every build.
+# It expands nvcc RSP files and translates flags so clangd understands them.
+# Add new .cu/.cpp files to CMakeLists.txt normally — this handles the rest.
+if(CMAKE_EXPORT_COMPILE_COMMANDS)
+    find_program(_TF_PYTHON python3)
+    if(_TF_PYTHON)
+        add_custom_target(clangd_db ALL
+            COMMAND "${_TF_PYTHON}"
+                    "${CMAKE_SOURCE_DIR}/scripts/fix_compile_commands.py"
+                    "${CMAKE_BINARY_DIR}/compile_commands.json"
+                    "${CMAKE_SOURCE_DIR}/compile_commands.json"
+                    --cuda-path /opt/cuda
+                    --sm 86
+                    --include "${CMAKE_SOURCE_DIR}/include"
+            COMMENT "Refreshing clangd compile_commands.json"
+            VERBATIM
+        )
+    endif()
+endif()
