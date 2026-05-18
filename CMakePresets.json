@@ -1,0 +1,37 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default (Release)",
+      "description": "Default preset — injects /opt/cuda/bin so the cmake language server finds nvcc",
+      "binaryDir": "${sourceDir}/build",
+      "environment": {
+        "PATH": "/opt/cuda/bin:$penv{PATH}"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE":      "Release",
+        "CMAKE_CUDA_COMPILER":   "/opt/cuda/bin/nvcc",
+        "CUDAToolkit_ROOT":      "/opt/cuda"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default"
+    },
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    }
+  ]
+}
