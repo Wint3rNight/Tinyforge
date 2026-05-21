@@ -53,6 +53,9 @@ target_link_libraries(hello_cuda PRIVATE tinyforge_ref)
 add_executable(test_setup src/test_setup.cu)
 target_link_libraries(test_setup PRIVATE tinyforge_ref)
 
+add_executable(vector_add src/kernels/vector_add.cu)
+target_link_libraries(vector_add PRIVATE tinyforge_ref)
+
 # ── clangd-friendly compile_commands.json ─────────────────────────────────────
 # 'clangd_db' runs scripts/fix_compile_commands.py after every build.
 # It expands nvcc RSP files and translates flags so clangd understands them.

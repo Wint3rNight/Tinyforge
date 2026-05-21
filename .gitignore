@@ -65,6 +65,8 @@ Thumbs.db
 
 # Local plan / private notes (kept out of public repo)
 CUDA_PROJECT_PLAN*.md
+STUDY_NOTES.md
 NOTES.md
 TODO.md
 .scratch/
+
