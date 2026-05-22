@@ -4,7 +4,7 @@ CUDA performance lab and (eventually) a minimal transformer inference engine, bu
 
 ## Status
 
-Phase 0 — project setup.
+Phase 1 complete (v0.1) — fundamentals via vector add and parallel reduction. See [CHANGELOG.md](CHANGELOG.md) for per-phase progress.
 
 ## Build
 
