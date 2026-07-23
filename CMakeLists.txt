@@ -16,6 +16,10 @@ endif()
 
 project(tinyforge LANGUAGES CXX CUDA)
 
+# cuBLAS is used as a *baseline / correctness oracle only* (Phase 2+), never as a
+# dependency of our own kernels. CUDAToolkit provides the imported CUDA::cublas.
+find_package(CUDAToolkit REQUIRED)
+
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 endif()
@@ -58,6 +62,9 @@ target_link_libraries(vector_add PRIVATE tinyforge_ref)
 
 add_executable(reduction src/kernels/reduction.cu)
 target_link_libraries(reduction PRIVATE tinyforge_ref)
+
+add_executable(gemm_v1_naive src/kernels/gemm_v1_naive.cu)
+target_link_libraries(gemm_v1_naive PRIVATE tinyforge_ref CUDA::cublas)
 
 # ── clangd-friendly compile_commands.json ─────────────────────────────────────
 # 'clangd_db' runs scripts/fix_compile_commands.py after every build.

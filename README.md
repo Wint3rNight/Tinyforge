@@ -4,7 +4,18 @@ CUDA performance lab and (eventually) a minimal transformer inference engine, bu
 
 ## Status
 
-Phase 1 complete (v0.1) — fundamentals via vector add and parallel reduction. See [CHANGELOG.md](CHANGELOG.md) for per-phase progress.
+Phase 2 complete (v0.2-alpha) — naive GEMM baseline with a cuBLAS reference and the first roofline + Nsight analysis. See [CHANGELOG.md](CHANGELOG.md) for per-phase progress and [docs/phase2-baseline.md](docs/phase2-baseline.md) for the Phase 2 writeup.
+
+## GEMM results so far
+
+Square FP32 GEMM on RTX 3050 (sm_86, 9.1 TFLOPS FP32 roof). cuBLAS SGEMM (pedantic FP32) as the reference. Every kernel is validated for correctness before timing.
+
+| Kernel | 4096³ GFLOPS | % of FP32 peak | % of cuBLAS |
+|---|---|---|---|
+| v1 naive | 463 | 5.1% | 11.2% |
+| _cuBLAS (reference)_ | _4121_ | _45%_ | _100%_ |
+
+The naive kernel profiles as **load-store-unit bound** (LSU 99%, DRAM only 58%, FMA units idle at 28%) — it's slow because of the *number* of redundant loads, not memory bandwidth. Removing that redundancy with shared-memory tiling is Phase 3. The table grows a row per phase.
 
 ## Build
 

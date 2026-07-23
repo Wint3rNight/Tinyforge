@@ -63,10 +63,18 @@ venv/
 .DS_Store
 Thumbs.db
 
+docs/*.md
+docs/*.pdf
+docs/*.docx
+docs/*.doc
+docs/*.docx
+
 # Local plan / private notes (kept out of public repo)
 CUDA_PROJECT_PLAN*.md
+CHANGELOG.md
 STUDY_NOTES.md
 NOTES.md
 TODO.md
 .scratch/
+
 
