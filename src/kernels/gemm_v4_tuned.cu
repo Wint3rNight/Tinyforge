@@ -10,6 +10,7 @@
 
 #include <tinyforge/benchmark.hpp>
 #include <tinyforge/cuda_check.hpp>
+#include <tinyforge/gpu_wake.cuh>
 #include <tinyforge/reference.hpp>
 
 #include <cublas_v2.h>
@@ -30,6 +31,10 @@
     } while (0)
 
 namespace {
+
+// SM count, filled in by main(); used to size the P-state wake-up burn.
+int g_num_sms = 16;
+
 
 template <int BM, int BN, int BK, int TM, int TN, int PAD>
 __global__ void gemm_tuned(const float* __restrict__ A,
@@ -108,23 +113,6 @@ __global__ void gemm_tuned(const float* __restrict__ A,
                 *reinterpret_cast<const float4*>(&acc[i][j]);
 }
 
-// Burn compute until the driver ramps the GPU out of its idle P-state. Without
-// this the FIRST size measured reports idle-clock numbers (~210 MHz) — the trap
-// that has now bitten us in Phases 1–5. Cheap insurance: ~1 s once per process.
-__global__ void gpu_wake(float* __restrict__ sink, int iters) {
-    float a = 1.0000001f, b = 0.9999999f, acc = threadIdx.x;
-    for (int i = 0; i < iters; ++i) acc = fmaf(a, b, acc);
-    if (acc == 12345.678f) *sink = acc;   // never true; defeats dead-code removal
-}
-
-void wake_gpu(int num_sms) {
-    float* d = nullptr;
-    TF_CUDA_CHECK(cudaMalloc(&d, sizeof(float)));
-    for (int i = 0; i < 15; ++i) gpu_wake<<<num_sms * 8, 256>>>(d, 200000);
-    TF_CUDA_CHECK(cudaDeviceSynchronize());
-    TF_CUDA_CHECK(cudaFree(d));
-}
-
 void cublas_sgemm_rowmajor(cublasHandle_t h, const float* dA, const float* dB,
                            float* dC, int M, int N, int K) {
     const float alpha = 1.0f, beta = 0.0f;
@@ -132,9 +120,10 @@ void cublas_sgemm_rowmajor(cublasHandle_t h, const float* dA, const float* dB,
                                 dB, N, dA, K, &beta, dC, N));
 }
 
-// Measured with src/kernels/fp32_peak.cu (pure-FMA, no memory traffic).
-// Replaces the bogus 9100 spec figure used through Phase 4. See O7.
-constexpr double kPeakFP32_GFLOPS = 6668.0;
+// Achievable FP32 ceiling MEASURED with src/kernels/fp32_peak.cu (pure FMA,
+// no memory traffic). The 9100 figure from the datasheet overstates this
+// card by ~30%; run-to-run it lands at 6.7-6.9 TFLOPS.
+constexpr double kPeakFP32_GFLOPS = 6884.0;
 constexpr int    kCpuOracleMaxN   = 1024;
 
 template <typename Launch>
@@ -176,14 +165,19 @@ bool run_one_size(cublasHandle_t h, int n) {
         std::vector<float> hCpu(eC);
         tinyforge::gemm_cpu(hA.data(), hB.data(), hCpu.data(), M, N, K);
         auto c = tinyforge::compare_matrices(hCpu.data(), hRef.data(), static_cast<int>(eC));
-        if (!c.passed) { std::fprintf(stderr, "cuBLAS vs CPU FAILED\n"); return false; }
+        if (!c.passed) {
+            std::fprintf(stderr, "N=%d FAILED (cuBLAS vs CPU): max_abs=%.3e\n",
+                         n, c.max_abs_diff);
+            cudaFree(dA); cudaFree(dB); cudaFree(dC);
+            return false;
+        }
     }
 
     // The CPU oracle above is a single-threaded N³ loop taking seconds, during
     // which the GPU falls back to its idle P-state. Re-wake AFTER all host work
     // and immediately before timing, or the first size measured reports idle
     // clocks (N=1024 read 8× low before this was added).
-    wake_gpu(16);
+    tinyforge::wake_gpu(g_num_sms);
 
     tinyforge::BenchConfig cfg;
     cfg.warmup_runs   = 3;
@@ -217,10 +211,20 @@ bool run_one_size(cublasHandle_t h, int n) {
 
     auto r_cublas = tinyforge::benchmark_kernel(
         [&]{ cublas_sgemm_rowmajor(h, dA, dB, dC, M, N, K); }, cfg);
-    tinyforge::print_result("  cuBLAS                ", r_cublas);
-    std::printf("  → best: %s  %.0f GFLOPS   %.1f%% of peak(6668)   %.1f%% of cuBLAS\n\n",
+    tinyforge::print_result("  cuBLAS (strict FP32)  ", r_cublas);
+
+    // Same cuBLAS call with its tensor-core path unlocked. NOT used as the
+    // correctness oracle — TF32's ~10-bit mantissa won't hold our tolerance —
+    // but reported so the comparison above isn't read as "beats cuBLAS".
+    TF_CUBLAS_CHECK(cublasSetMathMode(h, CUBLAS_TF32_TENSOR_OP_MATH));
+    auto r_tf32 = tinyforge::benchmark_kernel(
+        [&]{ cublas_sgemm_rowmajor(h, dA, dB, dC, M, N, K); }, cfg);
+    TF_CUBLAS_CHECK(cublasSetMathMode(h, CUBLAS_PEDANTIC_MATH));
+    tinyforge::print_result("  cuBLAS (TF32 tensor)  ", r_tf32);
+    std::printf("  → best: %s  %.0f GFLOPS   %.1f%% of peak   "
+                "%.1f%% of cuBLAS-FP32   %.1f%% of cuBLAS-TF32\n\n",
                 best_name, best, 100.0 * best / kPeakFP32_GFLOPS,
-                100.0 * best / r_cublas.gflops);
+                100.0 * best / r_cublas.gflops, 100.0 * best / r_tf32.gflops);
 
     TF_CUDA_CHECK(cudaFree(dA)); TF_CUDA_CHECK(cudaFree(dB)); TF_CUDA_CHECK(cudaFree(dC));
     return ok;
@@ -232,6 +236,7 @@ int main(int argc, char** argv) {
     TF_CUDA_CHECK(cudaSetDevice(0));
     cudaDeviceProp prop{};
     TF_CUDA_CHECK(cudaGetDeviceProperties(&prop, 0));
+    g_num_sms = prop.multiProcessorCount;
     cublasHandle_t h{};
     TF_CUBLAS_CHECK(cublasCreate(&h));
     TF_CUBLAS_CHECK(cublasSetMathMode(h, CUBLAS_PEDANTIC_MATH));
@@ -240,7 +245,7 @@ int main(int argc, char** argv) {
     std::printf("measured FP32 peak: %.0f GFLOPS (src/kernels/fp32_peak.cu)\n",
                 kPeakFP32_GFLOPS);
     std::printf("waking GPU out of idle P-state...\n");
-    wake_gpu(prop.multiProcessorCount);
+    tinyforge::wake_gpu(prop.multiProcessorCount);
     std::printf("done.\n\n");
 
     const int all[] = {1024, 2048, 4096};

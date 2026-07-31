@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 400" width="720" height="400" role="img" aria-label="Roofline placement of each kernel">
+  <title>Roofline placement of each kernel</title>
+
+  <style>
+    .surface { fill: #fcfcfb; }
+    .t-pri   { fill: #0b0b0b; }
+    .t-sec   { fill: #52514e; }
+    .t-mut   { fill: #78766f; }
+    .grid    { stroke: #e3e2dd; stroke-width: 1; }
+    .axis    { stroke: #c9c7c0; stroke-width: 1; }
+    .roof    { stroke: #9a9890; stroke-width: 2; stroke-dasharray: 6 4; fill: none; }
+    .ref     { fill: #9a9890; }
+    .accent  { fill: #2a78d6; }
+    .accent-s{ stroke: #2a78d6; }
+    .s0 { fill: #2a78d6; }  .s0-s { stroke: #2a78d6; }
+    .s1 { fill: #eb6834; }  .s1-s { stroke: #eb6834; }
+    .s2 { fill: #1baf7a; }  .s2-s { stroke: #1baf7a; }
+    .s3 { fill: #eda100; }  .s3-s { stroke: #eda100; }
+    .s4 { fill: #e87ba4; }  .s4-s { stroke: #e87ba4; }
+    .s5 { fill: #008300; }  .s5-s { stroke: #008300; }
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    @media (prefers-color-scheme: dark) {
+      .surface { fill: #1a1a19; }
+      .t-pri   { fill: #ffffff; }
+      .t-sec   { fill: #c3c2b7; }
+      .t-mut   { fill: #98968c; }
+      .grid    { stroke: #2f2f2d; }
+      .axis    { stroke: #4a4a46; }
+      .roof    { stroke: #7c7a73; }
+      .ref     { fill: #7c7a73; }
+      .accent  { fill: #3987e5; }
+      .accent-s{ stroke: #3987e5; }
+      .s0 { fill: #3987e5; }  .s0-s { stroke: #3987e5; }
+      .s1 { fill: #d95926; }  .s1-s { stroke: #d95926; }
+      .s2 { fill: #199e70; }  .s2-s { stroke: #199e70; }
+      .s3 { fill: #c98500; }  .s3-s { stroke: #c98500; }
+      .s4 { fill: #d55181; }  .s4-s { stroke: #d55181; }
+      .s5 { fill: #008300; }  .s5-s { stroke: #008300; }
+    }
+  </style>
+  <rect class="surface" x="0" y="0" width="720" height="400" rx="6"/>
+  <text class="t-pri" x="20" y="26" font-size="15" font-weight="600">Roofline — measured arithmetic intensity</text>
+  <text class="t-sec" x="20" y="44" font-size="12">GFLOPS vs AI from profiled DRAM traffic at N=1024 · ridge point 31 FLOP/byte</text>
+  <line class="grid" x1="62" y1="354.0" x2="570" y2="354.0"/>
+  <text class="t-mut" x="54" y="358.0" font-size="11" text-anchor="end">100</text>
+  <line class="grid" x1="62" y1="205.0" x2="570" y2="205.0"/>
+  <text class="t-mut" x="54" y="209.0" font-size="11" text-anchor="end">1,000</text>
+  <line class="grid" x1="62" y1="56.0" x2="570" y2="56.0"/>
+  <text class="t-mut" x="54" y="60.0" font-size="11" text-anchor="end">10,000</text>
+  <line class="grid" x1="62.0" y1="56" x2="62.0" y2="354"/>
+  <text class="t-mut" x="62.0" y="372" font-size="11" text-anchor="middle">1</text>
+  <line class="grid" x1="257.2" y1="56" x2="257.2" y2="354"/>
+  <text class="t-mut" x="257.2" y="372" font-size="11" text-anchor="middle">10</text>
+  <line class="grid" x1="452.5" y1="56" x2="452.5" y2="354"/>
+  <text class="t-mut" x="452.5" y="372" font-size="11" text-anchor="middle">100</text>
+  <path class="roof" d="M 62.0 301.8 L 352.4 80.2 L 570.0 80.2"/>
+  <text class="t-mut" x="96.4" y="267.6" font-size="10" transform="rotate(-31 96.4 267.6)">DRAM roof · 224 GB/s</text>
+  <text class="t-mut" x="566.0" y="72.2" font-size="10" text-anchor="end">compute roof · 6884 GFLOPS</text>
+  <circle class="accent" cx="165.1" cy="257.9" r="6"/>
+  <circle class="accent" cx="222.2" cy="266.0" r="6"/>
+  <circle class="accent" cx="434.3" cy="154.5" r="6"/>
+  <circle class="accent" cx="458.7" cy="113.3" r="6"/>
+  <circle class="accent" cx="438.8" cy="113.2" r="6"/>
+  <line class="axis" x1="446.8" y1="113.2" x2="578.0" y2="113.2"/>
+  <text class="t-sec" x="583" y="117.2" font-size="11">tuned (BK=16)</text>
+  <text class="t-mut" x="583" y="128.2" font-size="9">AI 85</text>
+  <line class="axis" x1="466.7" y1="113.3" x2="578.0" y2="139.2"/>
+  <text class="t-sec" x="583" y="143.2" font-size="11">+ float4</text>
+  <text class="t-mut" x="583" y="154.2" font-size="9">AI 108</text>
+  <line class="axis" x1="442.3" y1="154.5" x2="578.0" y2="165.2"/>
+  <text class="t-sec" x="583" y="169.2" font-size="11">register 8x8</text>
+  <text class="t-mut" x="583" y="180.2" font-size="9">AI 81</text>
+  <line class="axis" x1="173.1" y1="257.9" x2="578.0" y2="257.9"/>
+  <text class="t-sec" x="583" y="261.9" font-size="11">naive</text>
+  <text class="t-mut" x="583" y="272.9" font-size="9">AI 3</text>
+  <line class="axis" x1="230.2" y1="266.0" x2="578.0" y2="283.9"/>
+  <text class="t-sec" x="583" y="287.9" font-size="11">shared tiled</text>
+  <text class="t-mut" x="583" y="298.9" font-size="9">AI 7</text>
+  <line class="axis" x1="62" y1="354" x2="570" y2="354"/>
+  <text class="t-mut" x="316" y="390" font-size="11" text-anchor="middle">arithmetic intensity (FLOP / DRAM byte)</text>
+</svg>

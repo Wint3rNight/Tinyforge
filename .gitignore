@@ -40,7 +40,10 @@ results/*.csv
 results/*.json
 results/*.png
 results/*.svg
+results/*.txt
 !results/.gitkeep
+# The published sweep is a deliverable (linked from the README), not scratch output.
+!results/final_sweep.csv
 
 # Python (for scripts/)
 __pycache__/

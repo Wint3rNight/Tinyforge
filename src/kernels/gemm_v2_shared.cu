@@ -9,6 +9,7 @@
 
 #include <tinyforge/benchmark.hpp>
 #include <tinyforge/cuda_check.hpp>
+#include <tinyforge/gpu_wake.cuh>
 #include <tinyforge/reference.hpp>
 
 #include <cublas_v2.h>
@@ -29,6 +30,10 @@
     } while (0)
 
 namespace {
+
+// SM count, filled in by main(); used to size the P-state wake-up burn.
+int g_num_sms = 16;
+
 
 // Phase 2 baseline, duplicated here for a same-run comparison. (Both drivers
 // share a lot; extracting a common gemm harness is a Phase 4 cleanup.)
@@ -106,7 +111,10 @@ void cublas_sgemm_rowmajor(cublasHandle_t h,
                                 dB, N, dA, K, &beta, dC, N));
 }
 
-constexpr double kPeakFP32_GFLOPS = 9100.0;
+// Achievable FP32 ceiling MEASURED with src/kernels/fp32_peak.cu (pure FMA,
+// no memory traffic). The 9100 figure from the datasheet overstates this
+// card by ~30%; run-to-run it lands at 6.7-6.9 TFLOPS.
+constexpr double kPeakFP32_GFLOPS = 6884.0;
 constexpr int    kCpuOracleMaxN   = 1024;
 
 // Run `launch` once, copy the result back, and compare against `ref`.
@@ -190,6 +198,10 @@ bool run_one_size(cublasHandle_t h, int n) {
         return false;
     }
 
+    // The CPU oracle above is a multi-second single-threaded loop; the GPU
+    // idles down during it. Re-wake after all host work, before timing.
+    tinyforge::wake_gpu(g_num_sms);
+
     tinyforge::BenchConfig cfg;
     cfg.warmup_runs   = 3;
     cfg.timed_runs    = 15;
@@ -227,6 +239,7 @@ int main(int argc, char** argv) {
     TF_CUDA_CHECK(cudaSetDevice(0));
     cudaDeviceProp prop{}; 
     TF_CUDA_CHECK(cudaGetDeviceProperties(&prop, 0));
+    g_num_sms = prop.multiProcessorCount;
 
     cublasHandle_t handle{};
     TF_CUBLAS_CHECK(cublasCreate(&handle));

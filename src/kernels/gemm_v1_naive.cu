@@ -8,6 +8,7 @@
 
 #include <tinyforge/benchmark.hpp>
 #include <tinyforge/cuda_check.hpp>
+#include <tinyforge/gpu_wake.cuh>
 #include <tinyforge/reference.hpp>
 
 #include <cublas_v2.h>
@@ -29,6 +30,10 @@
     } while (0)
 
 namespace {
+
+// SM count, filled in by main(); used to size the P-state wake-up burn.
+int g_num_sms = 16;
+
 
 // threadIdx.x → columns (n) is the one decision that matters: with a 32-wide
 // block a warp spans 32 consecutive columns, so B/C loads coalesce and A
@@ -65,7 +70,10 @@ void cublas_sgemm_rowmajor(cublasHandle_t h,
                                 dC, N));      // "C_cublas" = our C, ld = N
 }
 
-constexpr double kPeakFP32_GFLOPS = 9100.0;  // RTX 3050 FP32 compute roof
+// Achievable FP32 ceiling MEASURED with src/kernels/fp32_peak.cu (pure FMA,
+// no memory traffic). The 9100 figure from the datasheet overstates this
+// card by ~30%; run-to-run it lands at 6.7-6.9 TFLOPS.
+constexpr double kPeakFP32_GFLOPS = 6884.0;
 constexpr int    kCpuOracleMaxN   = 1024;    // gemm_cpu above this is too slow
 
 bool run_one_size(cublasHandle_t h, int n) {
@@ -139,6 +147,10 @@ bool run_one_size(cublasHandle_t h, int n) {
     // kernel's traffic is mostly cache-served, so "achieved GB/s" is meaningless.
     const double flops = 2.0 * static_cast<double>(M) * N * K;
 
+    // The CPU oracle above is a multi-second single-threaded loop; the GPU
+    // idles down during it. Re-wake after all host work, before timing.
+    tinyforge::wake_gpu(g_num_sms);
+
     tinyforge::BenchConfig cfg;
     cfg.warmup_runs   = 3;
     cfg.timed_runs    = 15;
@@ -176,6 +188,7 @@ int main() {
     TF_CUDA_CHECK(cudaSetDevice(dev));
     cudaDeviceProp prop{};
     TF_CUDA_CHECK(cudaGetDeviceProperties(&prop, dev));
+    g_num_sms = prop.multiProcessorCount;
 
     cublasHandle_t handle{};
     TF_CUBLAS_CHECK(cublasCreate(&handle));
