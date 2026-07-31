@@ -69,6 +69,9 @@ target_link_libraries(gemm_v1_naive PRIVATE tinyforge_ref CUDA::cublas)
 add_executable(gemm_v2_shared src/kernels/gemm_v2_shared.cu)
 target_link_libraries(gemm_v2_shared PRIVATE tinyforge_ref CUDA::cublas)
 
+add_executable(gemm_v3_register src/kernels/gemm_v3_register.cu)
+target_link_libraries(gemm_v3_register PRIVATE tinyforge_ref CUDA::cublas)
+
 # ── clangd-friendly compile_commands.json ─────────────────────────────────────
 # 'clangd_db' runs scripts/fix_compile_commands.py after every build.
 # It expands nvcc RSP files and translates flags so clangd understands them.
