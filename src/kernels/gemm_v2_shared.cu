@@ -225,7 +225,7 @@ bool run_one_size(cublasHandle_t h, int n) {
 // profiles a deterministic launch sequence instead of the whole sweep.
 int main(int argc, char** argv) {
     TF_CUDA_CHECK(cudaSetDevice(0));
-    cudaDeviceProp prop{};
+    cudaDeviceProp prop{}; 
     TF_CUDA_CHECK(cudaGetDeviceProperties(&prop, 0));
 
     cublasHandle_t handle{};
