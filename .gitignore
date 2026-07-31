@@ -63,11 +63,12 @@ venv/
 .DS_Store
 Thumbs.db
 
+# Deep writeups are kept local during development (public repo = code + README).
+# Phase 7 produces the polished public writeup; un-ignore a curated file then.
 docs/*.md
 docs/*.pdf
 docs/*.docx
 docs/*.doc
-docs/*.docx
 
 # Local plan / private notes (kept out of public repo)
 CUDA_PROJECT_PLAN*.md
