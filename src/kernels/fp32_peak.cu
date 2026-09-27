@@ -47,8 +47,8 @@ int main() {
     // Each launch must run long enough — and the warmup long enough in total —
     // to pull the GPU out of its idle P-state. At iters=4096 (2.8 ms/launch) the
     // card stayed at 210 MHz / 10 W and reported ~776 GFLOPS, which measures the
-    // idle clock, not the hardware. Same trap as STUDY_NOTES O1. ~65 ms/launch
-    // with 20 warmups gives >1 s of sustained load before timing starts.
+    // idle clock, not the hardware. Same trap as STUDY_NOTES O1. ~7.6 ms/launch
+    // at full clock, so the 20 warmups add ~150 ms of sustained load before timing.
     const int iters = 100000;
 
     float* d_out = nullptr;

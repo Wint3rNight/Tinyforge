@@ -28,7 +28,7 @@ Square GEMM at 4096³, all from one benchmark sweep.
 | shared-memory tiled | 430 | 0.92× | 6% |
 | register tiled, 8×8 per thread | 2285 | 4.90× | 33% |
 | + `float4` loads | 3727 | 8.00× | 54% |
-| **tuned, BK=16 + padding** | **4289** | **9.20×** | **62%** |
+| **tuned, BK=16** | **4289** | **9.20×** | **62%** |
 | cuBLAS, strict FP32 | 4119 | 8.84× | 60% |
 
 The ceiling is measured, not taken from a spec sheet. I wrote a pure-FMA microbenchmark ([`fp32_peak.cu`](src/kernels/fp32_peak.cu)) and got 6884 GFLOPS. I'd been quoting 9100 from a datasheet until then, which made every percentage in this project wrong by about 30%.
@@ -51,7 +51,7 @@ I kept this kernel in the repo. It's the most useful thing I learned: an optimiz
 
 **Register tiling was the fix, 4.9×.**
 
-To change the load-to-multiply ratio, a thread has to own more than one output. Giving each thread an 8×8 block of C turns the inner loop into an outer product — 16 loads feeding 64 multiply-adds instead of 2 feeding 1. LSU pressure dropped from 99% to 62%. Adding `float4` loads cut load instructions another 4× for a further 1.6×, and a deeper K-slab gave 11% more.
+To change the load-to-multiply ratio, a thread has to own more than one output. Giving each thread an 8×8 block of C turns the inner loop into an outer product — 16 loads feeding 64 multiply-adds instead of 2 feeding 1. LSU pressure dropped from 99% to 62%. Adding `float4` loads cut load instructions another 4× for a further 1.6×, and a deeper K-slab gave about 10% more.
 
 **Occupancy dropped to a third and it got faster anyway.**
 
@@ -61,7 +61,7 @@ Worth being precise about: low occupancy isn't good here. It's a price that happ
 
 **Fixing bank conflicts was worth about 1%.**
 
-Padding the shared tile took bank conflicts from 16,777,216 to zero — I checked the hardware counter, it really is zero. It bought roughly nothing. Third time in this project that a textbook optimization turned out to target something that wasn't the bottleneck.
+At BK=8, padding the shared tile took bank conflicts from 16,777,216 to zero — I checked the hardware counter, it really is zero. It bought roughly nothing. Third time in this project that a textbook optimization turned out to target something that wasn't the bottleneck.
 
 There's a limit to the trick, too: `float4` alignment forces the padding to be a multiple of 4, and under that constraint no pad value spreads four column groups across banks. Padding runs out of road; XOR swizzling is what gets past it, and I haven't done that.
 
@@ -79,7 +79,7 @@ Worse: at N ≤ 1024 I run a CPU correctness check, which is a single-threaded t
 
 The harness now burns some junk compute to wake the card after all host-side work and immediately before timing. Timing itself uses CUDA events, discards warmup runs, and reports mean/std/min/max over 15+ samples so I don't report noise as a speedup.
 
-That helped a lot but didn't fully fix small matrices. At N=256 a kernel runs for well under a millisecond, which isn't enough work to hold the clocks up, and I still see the same kernel report 77 GFLOPS from one binary and 431 from another — each with a tight standard deviation, so it's the clock state rather than measurement jitter. At 4096 they agree to within a percent across binaries. **Every headline number here is at 4096³ for that reason**, and I'd treat the left-hand side of the size chart as directional rather than precise. Properly fixing it means locking clocks with `nvidia-smi --lock-gpu-clocks`, which needs root and which I haven't set up.
+That helped a lot but didn't fully fix small matrices. At N=256 a kernel runs for well under a millisecond, which isn't enough work to hold the clocks up, and I still see the same kernel report 77 GFLOPS from one binary and 431 from another — each with a tight standard deviation, so it's the clock state rather than measurement jitter. At 4096 the spread across binaries is a few percent: cuBLAS reads 4120 in one and 4119 in the other, the same `float4` kernel 3727 and 3884. **Every headline number here is at 4096³ for that reason**, and I'd treat the left-hand side of the size chart as directional rather than precise. Properly fixing it means locking clocks with `nvidia-smi --lock-gpu-clocks`, which needs root and which I haven't set up.
 
 ## Build
 
@@ -94,7 +94,7 @@ cmake --build build -j
 ./build/fp32_peak            # what this card can actually do
 ```
 
-Each GEMM binary takes an optional size (`./build/gemm_v4_tuned 4096`) which runs one size with a fixed launch order, so Nsight profiles are reproducible:
+The shared, register and tuned binaries take an optional size (`./build/gemm_v4_tuned 4096`) which runs one size with a fixed launch order, so Nsight profiles are reproducible:
 
 ```sh
 ncu --kernel-name gemm_tuned --launch-skip 48 --launch-count 1 --set full \
