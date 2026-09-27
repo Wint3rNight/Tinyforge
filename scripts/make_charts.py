@@ -28,20 +28,18 @@ SERIES = [
     ("cuBLAS",             [1649.1, 3391.4, 4295.5, 4618.1, 4119.0]),
 ]
 
-# Headline bar chart uses one same-run measurement at 4096 so every bar is
-# directly comparable, including cuBLAS with its tensor-core path unlocked.
+# Headline bar chart: the 4096 column of SERIES, so it matches the CSV.
 BARS_4096 = [
     ("naive",                    466.1,  "ours"),
     ("shared tiled",             429.7,  "ours"),
     ("register 8x8",            2285.2,  "ours"),
     ("+ float4",                3726.6,  "ours"),
-    ("tuned (BK=16)",           4424.1,  "ours"),
-    ("cuBLAS — strict FP32",    4216.4,  "ref"),
-    ("cuBLAS — TF32 tensor",    7728.4,  "tc"),
+    ("tuned (BK=16)",           4288.8,  "ours"),
+    ("cuBLAS — strict FP32",    4119.0,  "ref"),
 ]
 
 # Roofline: measured at N=1024. AI = FLOPs / measured DRAM bytes.
-#   dram_bytes = dram_pct * 224e9 * seconds
+#   dram_bytes = dram_pct * DRAM_GBPS * seconds
 PROFILED = [  # name, duration_s, dram_pct, gflops
     ("naive",         4.86e-3, 0.585, 441.6),
     ("shared tiled",  5.51e-3, 0.263, 389.5),
@@ -51,7 +49,7 @@ PROFILED = [  # name, duration_s, dram_pct, gflops
 ]
 
 PEAK_GFLOPS = 6884.0     # measured, src/kernels/fp32_peak.cu
-DRAM_GBPS = 224.0
+DRAM_GBPS = 192.0        # Nsight Compute's DRAM peak on this card; dram_pct is relative to it
 
 LIGHT = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300"]
 DARK = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300"]
@@ -111,15 +109,15 @@ def svg_open(w, h, title):
 # Magnitude comparison → emphasis form: our kernels one hue, cuBLAS gray.
 def chart_bars(path):
     rows = sorted(BARS_4096, key=lambda r: r[1])
-    W, H = 760, 372
     L, R, T = 178, 96, 56
-    plot_w = W - L - R
     bar_h, gap = 30, 12
+    W, H = 760, T + len(rows) * (bar_h + gap) + 22
+    plot_w = W - L - R
     vmax = max(r[1] for r in rows) * 1.06
 
     o = [svg_open(W, H, "GEMM throughput by kernel at 4096 cubed")]
     o.append(f'  <text class="t-pri" x="20" y="26" font-size="15" font-weight="600">'
-             f'GEMM throughput at 4096³ · single run, all bars comparable</text>\n')
+             f'GEMM throughput at 4096³ · results/final_sweep.csv</text>\n')
     o.append(f'  <text class="t-sec" x="20" y="44" font-size="12">'
              f'RTX 3050 Laptop · measured FP32 ceiling {PEAK_GFLOPS:.0f} GFLOPS · '
              f'higher is better</text>\n')
@@ -243,7 +241,7 @@ def chart_roofline(path):
     o.append(f'  <path class="roof" d="{d}"/>\n')
     o.append(f'  <text class="t-mut" x="{x_of(1.5):.1f}" y="{y_of(1.5 * DRAM_GBPS) - 8:.1f}" '
              f'font-size="10" transform="rotate(-31 {x_of(1.5):.1f} '
-             f'{y_of(1.5 * DRAM_GBPS) - 8:.1f})">DRAM roof · 224 GB/s</text>\n')
+             f'{y_of(1.5 * DRAM_GBPS) - 8:.1f})">DRAM roof · {DRAM_GBPS:.0f} GB/s</text>\n')
     o.append(f'  <text class="t-mut" x="{x_of(ai_hi) - 4:.1f}" y="{y_of(PEAK_GFLOPS) - 8:.1f}" '
              f'font-size="10" text-anchor="end">compute roof · {PEAK_GFLOPS:.0f} GFLOPS</text>\n')
 

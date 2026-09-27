@@ -1,0 +1,15 @@
+# ./build/gemm_v4_tuned 4096, run 2026-09-27
+== gemm_v4_tuned ==  NVIDIA GeForce RTX 3050 Laptop GPU  SMs=16
+measured FP32 peak: 6884 GFLOPS (src/kernels/fp32_peak.cu)
+waking GPU out of idle P-state...
+done.
+
+N=4096
+  128x128x8  pad0             mean=  35.067 ms  std=  0.189  min= 34.562  max= 35.279  n=15     3919.32 GFLOPS
+  128x128x8  pad4             mean=  35.219 ms  std=  0.280  min= 35.031  max= 35.965  n=15     3902.38 GFLOPS
+  128x128x16 pad4             mean=  31.631 ms  std=  0.179  min= 31.419  max= 31.964  n=15     4345.06 GFLOPS
+  64x64x16   pad4             mean=  43.153 ms  std=  0.178  min= 42.912  max= 43.491  n=15     3184.91 GFLOPS
+  cuBLAS (strict FP32)        mean=  33.183 ms  std=  0.770  min= 32.744  max= 35.609  n=15     4141.83 GFLOPS
+  cuBLAS (TF32 tensor)        mean=  18.247 ms  std=  0.045  min= 18.175  max= 18.311  n=15     7532.08 GFLOPS
+  → best: 128x128x16 pad4  4345 GFLOPS   63.1% of peak   104.9% of cuBLAS-FP32   57.7% of cuBLAS-TF32
+

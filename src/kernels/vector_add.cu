@@ -4,7 +4,7 @@
 //
 // Bandwidth-bound: 3 floats touched per FLOP (read a, read b, write c).
 // Theoretical FP32 add peak ~9.1 TFLOPS, but we are nowhere near it — the
-// 224 GB/s memory ceiling caps us at 224e9 / 12 = 18.7 GFLOPS for this kernel.
+// 192 GB/s memory ceiling caps us at 192e9 / 12 = 16 GFLOPS for this kernel.
 // That is the actual ceiling worth measuring against.
 //
 // Compared to the SAXPY in test_setup.cu, this kernel uses a grid-stride loop
@@ -111,10 +111,10 @@ int main() {
 
     cudaDeviceProp prop{};
     TF_CUDA_CHECK(cudaGetDeviceProperties(&prop, dev));
-    // RTX 3050 spec: 224 GB/s memory bandwidth. Vector add is 12 bytes/FLOP,
-    // so the bandwidth roof translates to ~18.7 GFLOPS — that is the ceiling
-    // any number we print here should be compared against.
-    constexpr double kPeakBW_GBps = 224.0;
+    // DRAM peak as Nsight Compute reports it on this card: 192 GB/s (the 224 GB/s
+    // spec figure is for faster memory). Vector add is 12 bytes/FLOP, so the
+    // bandwidth roof translates to 16 GFLOPS, the ceiling to compare against.
+    constexpr double kPeakBW_GBps = 192.0;
     std::printf("== vector_add ==  device=%s  SMs=%d  arch=sm_%d%d\n",
                 prop.name, prop.multiProcessorCount, prop.major, prop.minor);
     std::printf("theoretical ceiling: %.0f GB/s memory  →  %.1f GFLOPS at 12 B/FLOP\n\n",

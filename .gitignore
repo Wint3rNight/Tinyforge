@@ -44,6 +44,7 @@ results/*.txt
 !results/.gitkeep
 # The published sweep is a deliverable (linked from the README), not scratch output.
 !results/final_sweep.csv
+!results/tf32_4096.txt
 
 # Python (for scripts/)
 __pycache__/

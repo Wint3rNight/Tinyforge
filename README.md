@@ -4,13 +4,13 @@ I wanted to learn how GPUs actually work, so I wrote a matrix multiply and then 
 
 It runs on an RTX 3050 Laptop (sm_86). Everything is written from scratch — cuBLAS is here only as a stopwatch and an answer key.
 
-**End result: 9.5× faster than where I started, and level with cuBLAS when cuBLAS is held to the same numeric format.**
+**End result: 9.2× faster than where I started, and level with cuBLAS when cuBLAS is held to the same numeric format.**
 
 ![GEMM throughput by kernel at 4096³](assets/gflops-by-kernel.svg)
 
-## Read the last bar first
+## Tensor cores are still faster
 
-The bottom bar is cuBLAS with its tensor-core path turned on. It's 1.75× faster than my best kernel, using hardware I never touched.
+cuBLAS with its tensor-core path turned on (TF32) ran 1.73× faster than my best kernel at 4096³ ([`results/tf32_4096.txt`](results/tf32_4096.txt)), using hardware I never touched.
 
 I benchmark against cuBLAS in strict FP32 mode (`CUBLAS_PEDANTIC_MATH`) because I need it as a correctness oracle, and TF32's shorter mantissa won't hold my comparison tolerance. That restriction is also what makes the comparison close. So the claim I'll defend is narrow:
 
@@ -20,7 +20,7 @@ Not "faster than cuBLAS." cuBLAS handles any shape, any transpose, batching, eve
 
 ## Numbers
 
-Square GEMM at 4096³, all measured in one run so the bars above are directly comparable.
+Square GEMM at 4096³, all from one benchmark sweep.
 
 | Kernel | GFLOPS | vs naive | % of measured FP32 ceiling |
 |---|---|---|---|
@@ -28,9 +28,8 @@ Square GEMM at 4096³, all measured in one run so the bars above are directly co
 | shared-memory tiled | 430 | 0.92× | 6% |
 | register tiled, 8×8 per thread | 2285 | 4.90× | 33% |
 | + `float4` loads | 3727 | 8.00× | 54% |
-| **tuned, BK=16 + padding** | **4424** | **9.49×** | **64%** |
-| cuBLAS, strict FP32 | 4216 | 9.05× | 61% |
-| cuBLAS, TF32 tensor cores | 7728 | 16.6× | — |
+| **tuned, BK=16 + padding** | **4289** | **9.20×** | **62%** |
+| cuBLAS, strict FP32 | 4119 | 8.84× | 60% |
 
 The ceiling is measured, not taken from a spec sheet. I wrote a pure-FMA microbenchmark ([`fp32_peak.cu`](src/kernels/fp32_peak.cu)) and got 6884 GFLOPS. I'd been quoting 9100 from a datasheet until then, which made every percentage in this project wrong by about 30%.
 
@@ -46,7 +45,7 @@ I assumed bandwidth was the problem, because that's what everyone says about nai
 
 **Then shared-memory tiling made it slower.**
 
-This is the standard next step and it cost me 8%. It did what it advertises — DRAM traffic dropped 4.7× — but DRAM had spare capacity the whole time. The inner loop still ran two loads per multiply-add, and a shared-memory load burns a load/store slot exactly like a global one. So the bottleneck didn't move, and I'd added a tile-load phase and two barriers per iteration on top of it.
+This is the standard next step and it cost me 8%. It did what it advertises (DRAM traffic dropped about 2×), but DRAM had spare capacity the whole time. The inner loop still ran two loads per multiply-add, and a shared-memory load burns a load/store slot exactly like a global one. So the bottleneck didn't move, and I'd added a tile-load phase and two barriers per iteration on top of it.
 
 I kept this kernel in the repo. It's the most useful thing I learned: an optimization is only good relative to a bottleneck you've actually measured. Tutorials show this step winning because their baselines aren't coalesced. Mine already had an 88% L1 hit rate, so there wasn't much redundant traffic left to remove.
 
@@ -56,7 +55,7 @@ To change the load-to-multiply ratio, a thread has to own more than one output. 
 
 **Occupancy dropped to a third and it got faster anyway.**
 
-Register tiling pushed me from 36 to 127 registers per thread, so only 2 blocks fit per SM and occupancy fell from 99% to 33%. I expected that to hurt. It didn't, because occupancy exists to hide latency by having lots of warps to switch between, and this kernel instead gives each thread 64 independent multiply-adds to chew through. One warp can keep the pipelines busy on its own.
+Register tiling pushed me from 40 to 127 registers per thread, so only 2 blocks fit per SM and occupancy fell from 99% to 33%. I expected that to hurt. It didn't, because occupancy exists to hide latency by having lots of warps to switch between, and this kernel instead gives each thread 64 independent multiply-adds to chew through. One warp can keep the pipelines busy on its own.
 
 Worth being precise about: low occupancy isn't good here. It's a price that happened to be affordable. If I'd raised register usage without adding independent work per thread, the same drop would have wrecked performance.
 
@@ -68,7 +67,7 @@ There's a limit to the trick, too: `float4` alignment forces the padding to be a
 
 ![Roofline](assets/roofline.svg)
 
-Arithmetic intensity here comes from profiled DRAM traffic rather than the theoretical model, so it accounts for cache effects. The optimized kernels sit past the ridge point at 31 FLOP/byte, which means they're genuinely compute-bound; the naive and shared-memory versions are still far to the left.
+Arithmetic intensity here comes from profiled DRAM traffic rather than the theoretical model, so it accounts for cache effects. The optimized kernels sit past the ridge point at 36 FLOP/byte, which means they're genuinely compute-bound; the naive and shared-memory versions are still far to the left.
 
 ## Measuring this thing was harder than writing it
 
@@ -80,7 +79,7 @@ Worse: at N ≤ 1024 I run a CPU correctness check, which is a single-threaded t
 
 The harness now burns some junk compute to wake the card after all host-side work and immediately before timing. Timing itself uses CUDA events, discards warmup runs, and reports mean/std/min/max over 15+ samples so I don't report noise as a speedup.
 
-That helped a lot but didn't fully fix small matrices. At N=256 a kernel runs for well under a millisecond, which isn't enough work to hold the clocks up, and I still see the same kernel report 77 GFLOPS from one binary and 431 from another — each with a tight standard deviation, so it's the clock state rather than measurement jitter. Large sizes agree to within a percent across binaries. **Every headline number here is at 4096³ for that reason**, and I'd treat the left-hand side of the size chart as directional rather than precise. Properly fixing it means locking clocks with `nvidia-smi --lock-gpu-clocks`, which needs root and which I haven't set up.
+That helped a lot but didn't fully fix small matrices. At N=256 a kernel runs for well under a millisecond, which isn't enough work to hold the clocks up, and I still see the same kernel report 77 GFLOPS from one binary and 431 from another — each with a tight standard deviation, so it's the clock state rather than measurement jitter. At 4096 they agree to within a percent across binaries. **Every headline number here is at 4096³ for that reason**, and I'd treat the left-hand side of the size chart as directional rather than precise. Properly fixing it means locking clocks with `nvidia-smi --lock-gpu-clocks`, which needs root and which I haven't set up.
 
 ## Build
 
@@ -119,5 +118,5 @@ src/kernels/       gemm_v1_naive · gemm_v2_shared · gemm_v3_register · gemm_v
 include/tinyforge/ benchmark.hpp (CUDA-event timing) · reference.hpp · cuda_check.hpp
 src/reference/     CPU oracle, deterministic inputs, tolerant comparison
 scripts/           chart generation, benchmark runner
-results/           final_sweep.csv
+results/           final_sweep.csv · tf32_4096.txt
 ```

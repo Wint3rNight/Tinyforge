@@ -1,7 +1,8 @@
 // Parallel reduction: sum N floats into one float.
 //
 // Bandwidth-bound: reads N*4 bytes, does ~N adds. 4 B/FLOP → ceiling at
-// 224 GB/s ÷ 4 = 56 GFLOPS on this card.
+// 192 GB/s ÷ 4 = 48 GFLOPS on this card (192 GB/s is the DRAM peak Nsight
+// Compute reports here; the 224 GB/s spec figure is for faster memory).
 //
 // Four versions on the Mark Harris progression:
 //   v1  interleaved      naive — divergent within every warp
@@ -234,7 +235,7 @@ int main() {
 
     cudaDeviceProp prop{};
     TF_CUDA_CHECK(cudaGetDeviceProperties(&prop, dev));
-    constexpr double kPeakBW_GBps = 224.0;
+    constexpr double kPeakBW_GBps = 192.0;
     std::printf("== reduction ==  device=%s  SMs=%d  arch=sm_%d%d\n",
                 prop.name, prop.multiProcessorCount, prop.major, prop.minor);
     std::printf("theoretical ceiling: %.0f GB/s memory  →  %.1f GFLOPS at 4 B/FLOP\n",
